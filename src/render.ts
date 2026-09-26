@@ -3,7 +3,7 @@ import type { Backgrounds } from './background';
 import { fillCircle } from './background';
 import type { Bug } from './behavior';
 import { SPECIES } from './bugs';
-import { BUG_SCALE, CATCH, NET, RESULT_INPUT_DELAY, TERRAIN, TIME, UI, VIEW } from './config';
+import { BUG_SCALE, CATCH, NET, SPAWN, RESULT_INPUT_DELAY, TERRAIN, TIME, UI, VIEW } from './config';
 import type { Game } from './game';
 import type { Layout } from './layout';
 import { netPose, reachFor, ringCenter } from './net';
@@ -112,7 +112,16 @@ export class Renderer {
       fillCircle(ctx, '#a8b820', bug.x, bug.y + 6, 14);
       ctx.restore();
     }
-    ctx.drawImage(this.frame(sp, bug), x, y, w, h);
+    // 草むら・木の裏から現れる途中はフェードイン
+    const alpha = bug.appear > 0 ? 1 - bug.appear / SPAWN.appearTime : 1;
+    if (alpha < 1) {
+      ctx.save();
+      ctx.globalAlpha = alpha;
+      ctx.drawImage(this.frame(sp, bug), x, y, w, h);
+      ctx.restore();
+    } else {
+      ctx.drawImage(this.frame(sp, bug), x, y, w, h);
+    }
   }
 
   private drawBugs(game: Game, time: number): void {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isGone, spawnBug, updateBug } from './behavior';
+import { isGone, roamRange, spawnBug, updateBug } from './behavior';
 import { SPECIES, speciesById } from './bugs';
 import { VIEW } from './config';
 import { chooseSpecies, Population, targetCount } from './population';
@@ -139,7 +139,7 @@ describe('虫の行動', () => {
 });
 
 describe('Population', () => {
-  it('90 秒の間、目標数を超えず、時間帯外の虫はやがて退場する', () => {
+  it('90 秒の間、滞在中の虫は目標数を超えず、時間帯外の虫はやがて退場する', () => {
     const world = createWorld(360);
     const rng = createRng(11);
     const pop = new Population(world, rng);
@@ -150,7 +150,9 @@ describe('Population', () => {
     for (let t = 0; t < 90; t += DT) {
       const phase = t < 30 ? 'day' : t < 60 ? 'dusk' : 'night';
       pop.update(DT, phase);
-      expect(pop.bugs.length).toBeLessThanOrEqual(target);
+      // 退場中の虫を除けば目標数以内。退場中を含めても 1.5 倍まで
+      expect(pop.bugs.filter((b) => !b.leaving).length).toBeLessThanOrEqual(target);
+      expect(pop.bugs.length).toBeLessThanOrEqual(Math.ceil(target * 1.5));
       if (t > 5) minCount = Math.min(minCount, pop.bugs.length);
       if (t > 75) {
         for (const b of pop.bugs) expect(b.species.weights.night > 0 || b.leaving, b.species.id).toBe(true);
@@ -178,5 +180,65 @@ describe('Population', () => {
     const wide = createWorld(800);
     pop.setWorld(wide);
     for (const b of pop.bugs) if (b.trunk) expect(wide.trunks).toContain(b.trunk);
+  });
+});
+
+describe('草むら・木の裏からの登場', () => {
+  it('画面端以外から現れる虫がいて、現れた位置は画面内で中央寄り', () => {
+    const world = createWorld(360);
+    const rng = createRng(21);
+    let hidden = 0;
+    const n = 400;
+    for (let i = 0; i < n; i++) {
+      const sp = SPECIES[i % SPECIES.length]!;
+      const bug = spawnBug(sp, world, rng, false);
+      if (bug.appear > 0) {
+        hidden++;
+        expect(bug.x, sp.id).toBeGreaterThan(0);
+        expect(bug.x, sp.id).toBeLessThan(world.width);
+        expect(bug.entered).toBe(true);
+      }
+    }
+    expect(hidden / n).toBeGreaterThan(0.5);
+  });
+
+  it('オニヤンマは常に画面端から横切る', () => {
+    const world = createWorld(360);
+    const rng = createRng(22);
+    for (let i = 0; i < 50; i++) {
+      const bug = spawnBug(speciesById('oniyanma'), world, rng, false);
+      expect(bug.appear).toBe(0);
+      expect(bug.x < 0 || bug.x > world.width).toBe(true);
+    }
+  });
+
+  it('動き回る範囲は画面幅に比例し、中央を含む', () => {
+    for (const w of [360, 1138]) {
+      const world = createWorld(w);
+      const r = roamRange(world, 10);
+      expect(r.min).toBeLessThan(w / 2);
+      expect(r.max).toBeGreaterThan(w / 2);
+      expect(r.max - r.min).toBeLessThan(w);
+    }
+  });
+
+  it('中央レーンに虫がいない時間が長く続かない', () => {
+    for (const w of [360, 1138]) {
+      for (let seed = 1; seed <= 3; seed++) {
+        const world = createWorld(w);
+        const pop = new Population(world, createRng(seed));
+        pop.fill('day');
+        const DT = 1 / 60;
+        let empty = 0;
+        let longest = 0;
+        for (let t = 0; t < 90; t += DT) {
+          pop.update(DT, t < 30 ? 'day' : t < 60 ? 'dusk' : 'night');
+          const inLane = pop.bugs.some((b) => Math.abs(b.x - w / 2) < 30 && b.y > 60 && b.y < 500);
+          empty = inLane ? 0 : empty + DT;
+          longest = Math.max(longest, empty);
+        }
+        expect(longest, `width ${w} seed ${seed}`).toBeLessThan(6);
+      }
+    }
   });
 });

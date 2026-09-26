@@ -94,8 +94,19 @@ export const SPAWN = {
   minPer360: 6,
   maxPer360: 8,
   /** 虫が消えてから補充するまでの時間（秒） */
-  minRespawnDelay: 0.8,
-  maxRespawnDelay: 2.2,
+  minRespawnDelay: 0.3,
+  maxRespawnDelay: 1.0,
+  /** 画面端ではなく、草むらや木の裏から出てくる割合 */
+  hiddenSpawnChance: 0.75,
+  /** 草むら・木の裏から出てくるとき、中央（主人公の真上）からの距離の範囲 */
+  hiddenSpawnMinOffset: 50,
+  hiddenSpawnMaxOffset: 200,
+  /** 草むら・木の裏から出てくるときのフェードインの時間（秒） */
+  appearTime: 0.5,
+  /** 滞在中の虫が動き回る範囲（中央からの距離 = 画面幅 × この値）。中央レーンを横切りやすくする */
+  roamRatio: 1 / 3,
+  /** 飛び移る虫が中央の木を選ぶ確率 */
+  centerTrunkChance: 0.6,
   /** 時間帯外になった虫が退場を始めるまでの猶予（秒） */
   minLeaveDelay: 0.5,
   maxLeaveDelay: 3.5,
