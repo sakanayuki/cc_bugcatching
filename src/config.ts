@@ -29,7 +29,7 @@ export const MAX_FRAME_DT = 0.1;
 /** 虫取り網 */
 export const NET = {
   /** 最大まで振りかぶるのにかかる時間（秒） */
-  chargeTime: 1.0,
+  chargeTime: 2.0,
   /** 到達距離（網の支点から真上へ, px） */
   minReach: 40,
   maxReach: 460,
@@ -37,15 +37,15 @@ export const NET = {
   minSwingTime: 0.15,
   maxSwingTime: 0.35,
   /** 到達点で網を止めておく時間（判定あり, 秒） */
-  holdTime: 0.06,
+  holdTime: 0.3,
   /** 振り終わりの硬直時間（秒）。この間に網を戻す */
-  recoverTime: 0.25,
+  recoverTime: 0.2,
   /** スイング進行度がこの値以上で捕獲判定を行う */
-  hitWindowStart: 0.6,
+  hitWindowStart: 0.35,
   /** 網の輪の内側の半径 */
-  ringRadius: 14,
+  ringRadius: 30,
   /** 構えているときの柄の長さ */
-  restLength: 26,
+  restLength: 36,
   /** 構えの角度（度, 0 = 右, -90 = 真上） */
   readyAngle: -60,
   /** 最大まで振りかぶったときの角度 */
@@ -54,8 +54,14 @@ export const NET = {
   hitSubsteps: 4,
 } as const;
 
-/** 虫の当たり判定は見た目の何割か */
-export const BUG_HIT_SCALE = 0.7;
+/** 虫の当たり判定は見た目の何割か（3 歳児向けに見た目いっぱいまで） */
+export const BUG_HIT_SCALE = 1.0;
+
+/** 虫のドット絵の表示倍率（スプライト 1px を何 px で描くか） */
+export const BUG_SCALE = 2;
+
+/** 虫の動きの速さの倍率。1 未満で全体をゆっくりにする（移動・停止・滞在時間すべて） */
+export const BUG_SPEED_SCALE = 0.6;
 
 /** プレイ時間と時間帯 */
 export const TIME = {

@@ -21,9 +21,9 @@ describe('pickCatch', () => {
     expect(pickCatch(0, 0, 14, targets)).toBe(1);
   });
 
-  it('当たり判定は見た目より小さい', () => {
-    expect(hitRadiusFor(16, 16)).toBeCloseTo(8 * BUG_HIT_SCALE);
-    expect(hitRadiusFor(16, 16)).toBeLessThan(8);
+  it('当たり判定は見た目の大きさを基準にする（小さい子向けに見た目いっぱいまで）', () => {
+    expect(hitRadiusFor(32, 32)).toBeCloseTo(16 * BUG_HIT_SCALE);
+    expect(hitRadiusFor(48, 32)).toBeCloseTo(16 * BUG_HIT_SCALE);
   });
 });
 
