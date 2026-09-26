@@ -9,7 +9,7 @@ import type {
   WalkParams,
   ZigzagParams,
 } from './bugs';
-import { BUG_SPEED_SCALE } from './config';
+import { BUG_SPEED_SCALE, SPAWN } from './config';
 import { chance, pick, range, type Rng } from './rng';
 import { perchRange, type Trunk, type World } from './world';
 
@@ -47,6 +47,8 @@ export interface Bug {
   crawlDir: number;
   crawlStop: number;
   stopX: number | null;
+  /** 草むら・木の裏から現れる途中なら残り時間（秒）。描画の透明度に使う */
+  appear: number;
 }
 
 let nextUid = 1;
@@ -81,6 +83,7 @@ function base(species: Species, rng: Rng): Bug {
     crawlDir: 1,
     crawlStop: 0,
     stopX: null,
+    appear: 0,
   };
 }
 
@@ -92,9 +95,52 @@ function enterFromSide(bug: Bug, world: World, rng: Rng): 1 | -1 {
   return bug.facing;
 }
 
+/** 虫が動き回る範囲。広い画面でも中央（主人公の真上）付近を行き来させる */
+export function roamRange(world: World, margin: number): { min: number; max: number } {
+  const cx = world.width / 2;
+  const half = roamHalfWidth(world);
+  return {
+    min: Math.max(margin, cx - half),
+    max: Math.min(world.width - margin, cx + half),
+  };
+}
+
+/** 中央から動き回る範囲の端までの距離 */
+export function roamHalfWidth(world: World): number {
+  return world.width * SPAWN.roamRatio;
+}
+
+function centerTrunk(world: World): Trunk {
+  const cx = world.width / 2;
+  return world.trunks.reduce((a, t) => (Math.abs(t.x - cx) < Math.abs(a.x - cx) ? t : a));
+}
+
+/**
+ * 画面端ではなく、中央から少し離れた草むら・木の裏から現れる位置を決める。
+ * 近くに木があれば幹の位置（木の裏）から出る。戻り値は中央へ向かう向き。
+ */
+function hiddenOrigin(bug: Bug, world: World, rng: Rng): 1 | -1 {
+  const cx = world.width / 2;
+  const side = chance(rng, 0.5) ? -1 : 1;
+  const maxOff = Math.min(SPAWN.hiddenSpawnMaxOffset, roamHalfWidth(world) + 30, cx - bug.species.width / 2);
+  const off = range(rng, Math.min(SPAWN.hiddenSpawnMinOffset, maxOff), maxOff);
+  let x = cx + side * off;
+  const tree = world.trunks.find((t) => Math.abs(t.x - x) < 40 && Math.abs(t.x - cx) > 20);
+  if (tree) x = tree.x;
+  bug.x = x;
+  bug.entered = true;
+  bug.appear = SPAWN.appearTime;
+  bug.facing = side > 0 ? -1 : 1;
+  return bug.facing;
+}
+
 function pickPerch(bug: Bug, world: World, rng: Rng, exclude: Trunk | null): void {
+  const center = centerTrunk(world);
   const candidates = world.trunks.filter((t) => t !== exclude);
-  const trunk = pick(rng, candidates.length > 0 ? candidates : world.trunks);
+  const trunk =
+    center !== exclude && chance(rng, SPAWN.centerTrunkChance)
+      ? center
+      : pick(rng, candidates.length > 0 ? candidates : world.trunks);
   const r = perchRange(trunk);
   bug.trunk = trunk;
   bug.targetX = trunk.x + Math.round(range(rng, -3, 3));
@@ -108,8 +154,10 @@ function pickPerch(bug: Bug, world: World, rng: Rng, exclude: Trunk | null): voi
 export function spawnBug(species: Species, world: World, rng: Rng, initial: boolean): Bug {
   const bug = base(species, rng);
   const b = species.behavior;
-  const w = world.width;
-  const inside = () => range(rng, 24, w - 24);
+  const roam = roamRange(world, 24);
+  const inside = () => range(rng, roam.min, roam.max);
+  // オニヤンマは画面を横切る虫なので常に画面端から
+  const hidden = !initial && b.pattern !== 'dash' && chance(rng, SPAWN.hiddenSpawnChance);
   switch (b.pattern) {
     case 'walk':
     case 'hop': {
@@ -117,6 +165,9 @@ export function spawnBug(species: Species, world: World, rng: Rng, initial: bool
       if (initial) {
         bug.x = inside();
         bug.facing = chance(rng, 0.5) ? 1 : -1;
+      } else if (hidden) {
+        // 草むらの中から出てくる
+        hiddenOrigin(bug, world, rng);
       } else {
         enterFromSide(bug, world, rng);
       }
@@ -131,6 +182,17 @@ export function spawnBug(species: Species, world: World, rng: Rng, initial: bool
         bug.y = bug.targetY;
         bug.mode = 'perch';
         bug.timer = range(rng, b.perchTime[0], b.perchTime[1]);
+      } else if (hidden) {
+        // 木の裏から這い出てくる
+        const side = world.trunks.filter((t) => t !== bug.trunk);
+        const from = side.length > 0 ? pick(rng, side) : bug.trunk!;
+        const r = perchRange(from);
+        bug.x = from.x;
+        bug.y = range(rng, r.top, r.bottom);
+        bug.entered = true;
+        bug.appear = SPAWN.appearTime;
+        bug.mode = 'fly';
+        bug.flying = true;
       } else {
         enterFromSide(bug, world, rng);
         bug.y = range(rng, 90, 260);
@@ -144,6 +206,9 @@ export function spawnBug(species: Species, world: World, rng: Rng, initial: bool
       if (initial) {
         bug.x = inside();
         bug.heading = range(rng, 0, Math.PI * 2);
+      } else if (hidden) {
+        const dir = hiddenOrigin(bug, world, rng);
+        bug.heading = (dir > 0 ? 0 : Math.PI) + range(rng, -0.5, 0.5);
       } else {
         const dir = enterFromSide(bug, world, rng);
         bug.heading = (dir > 0 ? 0 : Math.PI) + range(rng, -0.5, 0.5);
@@ -159,6 +224,10 @@ export function spawnBug(species: Species, world: World, rng: Rng, initial: bool
       if (initial) {
         bug.anchorX = inside();
         bug.anchorVx = chance(rng, 0.5) ? drift : -drift;
+      } else if (hidden) {
+        const dir = hiddenOrigin(bug, world, rng);
+        bug.anchorX = bug.x;
+        bug.anchorVx = dir * drift;
       } else {
         const dir = enterFromSide(bug, world, rng);
         bug.anchorX = bug.x;
@@ -175,12 +244,13 @@ export function spawnBug(species: Species, world: World, rng: Rng, initial: bool
       bug.baseY = bug.y = range(rng, b.band.top, b.band.bottom);
       bug.vx = dir * b.speed;
       bug.mode = 'dash';
-      bug.stopX = chance(rng, b.stopChance) ? range(rng, w * 0.25, w * 0.75) : null;
+      // 空中で止まるのは主人公の真上の近く
+      bug.stopX = chance(rng, b.stopChance) ? world.width / 2 + range(rng, -50, 50) : null;
       bug.flying = true;
       break;
     }
     case 'zigzag': {
-      const dir = enterFromSide(bug, world, rng);
+      const dir = hidden ? hiddenOrigin(bug, world, rng) : enterFromSide(bug, world, rng);
       bug.y = range(rng, b.band.top, b.band.bottom);
       bug.heading = (dir > 0 ? 0 : Math.PI) + range(rng, -0.6, 0.6);
       bug.timer = range(rng, b.turnInterval[0], b.turnInterval[1]);
@@ -235,7 +305,6 @@ function turnToward(a: number, b: number, maxStep: number): number {
 }
 
 function updateWalk(bug: Bug, b: WalkParams, world: World, rng: Rng, dt: number): void {
-  const w = world.width;
   if (bug.leaving) {
     bug.x += bug.facing * b.leaveSpeed * dt;
     bug.moving = true;
@@ -267,14 +336,13 @@ function updateWalk(bug: Bug, b: WalkParams, world: World, rng: Rng, dt: number)
       }
   }
   if (bug.entered) {
-    const half = bug.species.width / 2;
-    if (bug.x < half && bug.facing < 0) bug.facing = 1;
-    if (bug.x > w - half && bug.facing > 0) bug.facing = -1;
+    const roam = roamRange(world, bug.species.width / 2);
+    if (bug.x < roam.min && bug.facing < 0) bug.facing = 1;
+    if (bug.x > roam.max && bug.facing > 0) bug.facing = -1;
   }
 }
 
 function updateHop(bug: Bug, b: HopParams, world: World, rng: Rng, dt: number): void {
-  const w = world.width;
   if (bug.mode === 'jump') {
     bug.vy += b.gravity * dt;
     bug.x += bug.vx * dt;
@@ -293,8 +361,9 @@ function updateHop(bug: Bug, b: HopParams, world: World, rng: Rng, dt: number): 
   if (bug.moving) bug.x += bug.facing * b.walkSpeed * dt;
   if (bug.timer > 0) return;
   if (!bug.leaving) {
-    if (bug.x < 70) bug.facing = 1;
-    else if (bug.x > w - 70) bug.facing = -1;
+    const roam = roamRange(world, 40);
+    if (bug.x < roam.min + 30) bug.facing = 1;
+    else if (bug.x > roam.max - 30) bug.facing = -1;
     else if (chance(rng, 0.35)) bug.facing = bug.facing === 1 ? -1 : 1;
   }
   const sx = bug.leaving ? b.leaveSpeed : range(rng, b.jumpSpeedX[0], b.jumpSpeedX[1]);
@@ -363,7 +432,6 @@ function updatePerch(bug: Bug, b: PerchParams, world: World, rng: Rng, dt: numbe
 }
 
 function updateMeander(bug: Bug, b: MeanderParams, world: World, rng: Rng, dt: number): void {
-  const w = world.width;
   const speed = bug.leaving ? b.leaveSpeed : b.speed;
   if (bug.leaving) {
     const goal = bug.facing > 0 ? -0.35 : Math.PI + 0.35;
@@ -372,8 +440,9 @@ function updateMeander(bug: Bug, b: MeanderParams, world: World, rng: Rng, dt: n
     bug.heading += (rng.next() - 0.5) * 2 * ((b.turnJitter * Math.PI) / 180) * dt * 3;
     if (bug.baseY < b.band.top) bug.heading = turnToward(bug.heading, Math.PI / 2, 2 * dt);
     if (bug.baseY > b.band.bottom) bug.heading = turnToward(bug.heading, -Math.PI / 2, 2 * dt);
-    if (bug.entered && bug.x < 20) bug.heading = turnToward(bug.heading, 0, 3 * dt);
-    if (bug.entered && bug.x > w - 20) bug.heading = turnToward(bug.heading, Math.PI, 3 * dt);
+    const roam = roamRange(world, 20);
+    if (bug.entered && bug.x < roam.min) bug.heading = turnToward(bug.heading, 0, 3 * dt);
+    if (bug.entered && bug.x > roam.max) bug.heading = turnToward(bug.heading, Math.PI, 3 * dt);
   }
   bug.x += Math.cos(bug.heading) * speed * dt;
   bug.baseY += Math.sin(bug.heading) * speed * dt;
@@ -383,13 +452,13 @@ function updateMeander(bug: Bug, b: MeanderParams, world: World, rng: Rng, dt: n
 }
 
 function updateHover(bug: Bug, b: HoverParams, world: World, rng: Rng, dt: number): void {
-  const w = world.width;
   if (bug.leaving) {
     bug.anchorVx = bug.facing * b.leaveSpeed;
     bug.anchorY -= 12 * dt;
   } else if (bug.entered) {
-    if (bug.anchorX < 30 && bug.anchorVx < 0) bug.anchorVx = -bug.anchorVx;
-    if (bug.anchorX > w - 30 && bug.anchorVx > 0) bug.anchorVx = -bug.anchorVx;
+    const roam = roamRange(world, 30);
+    if (bug.anchorX < roam.min && bug.anchorVx < 0) bug.anchorVx = -bug.anchorVx;
+    if (bug.anchorX > roam.max && bug.anchorVx > 0) bug.anchorVx = -bug.anchorVx;
   }
   bug.anchorX += bug.anchorVx * dt;
   bug.timer -= dt;
@@ -439,7 +508,8 @@ function updateZigzag(bug: Bug, b: ZigzagParams, world: World, rng: Rng, dt: num
     bug.heading = turnToward(bug.heading, goal, 6 * dt);
   } else {
     bug.timer -= dt;
-    const outside = bug.y < b.band.top || bug.y > b.band.bottom || (bug.entered && (bug.x < 24 || bug.x > w - 24));
+    const roam = roamRange(world, 24);
+    const outside = bug.y < b.band.top || bug.y > b.band.bottom || (bug.entered && (bug.x < roam.min || bug.x > roam.max));
     if (bug.timer <= 0 || (outside && bug.timer < 0.15)) {
       if (outside) {
         const toCenter = Math.atan2((b.band.top + b.band.bottom) / 2 - bug.y, w / 2 - bug.x);
@@ -462,6 +532,7 @@ export function updateBug(bug: Bug, world: World, rng: Rng, realDt: number): voi
   // 虫の時間だけゆっくり流す
   const dt = realDt * BUG_SPEED_SCALE;
   bug.age += dt;
+  if (bug.appear > 0) bug.appear = Math.max(0, bug.appear - realDt);
   if (!bug.leaving && bug.age >= bug.stayLimit) startLeaving(bug, world);
   const b = bug.species.behavior;
   switch (b.pattern) {

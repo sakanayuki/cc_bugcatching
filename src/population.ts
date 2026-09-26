@@ -5,6 +5,9 @@ import type { Phase } from './phase';
 import { range, weightedPick, type Rng } from './rng';
 import type { World } from './world';
 
+/** 退場中の虫を含めた画面内の数の上限（目標数に対する倍率） */
+const MAX_OVERFLOW = 1.5;
+
 /** 表示幅から常時の虫の数（上限）を求める。幅 360 で SPAWN.maxPer360 */
 export function targetCount(width: number): number {
   return Math.max(SPAWN.minPer360, Math.round((SPAWN.maxPer360 * width) / VIEW.minWidth));
@@ -68,10 +71,7 @@ export class Population {
   /** 捕獲などで虫を取り除く */
   remove(bug: Bug): void {
     const i = this.bugs.indexOf(bug);
-    if (i >= 0) {
-      this.bugs.splice(i, 1);
-      this.scheduleRespawn();
-    }
+    if (i >= 0) this.bugs.splice(i, 1);
   }
 
   update(dt: number, phase: Phase): void {
@@ -85,22 +85,20 @@ export class Population {
       updateBug(bug, world, this.rng, dt);
     }
     for (let i = this.bugs.length - 1; i >= 0; i--) {
-      if (isGone(this.bugs[i]!, world, VIEW.height)) {
-        this.bugs.splice(i, 1);
-        this.scheduleRespawn();
-      }
+      if (isGone(this.bugs[i]!, world, VIEW.height)) this.bugs.splice(i, 1);
     }
-    // 幅が変わった場合も含め、目標数に合わせて補充予定を調整
+    // 目標数に合わせて補充予定を調整する。退場中の虫は数えず、去っていく間に交代の虫を出す
     const target = targetCount(world.width);
-    while (this.bugs.length + this.pending.length < target) this.scheduleRespawn();
-    while (this.pending.length > 0 && this.bugs.length + this.pending.length > target) this.pending.pop();
+    const active = () => this.bugs.filter((b) => !b.leaving).length;
+    while (active() + this.pending.length < target) this.scheduleRespawn();
+    while (this.pending.length > 0 && active() + this.pending.length > target) this.pending.pop();
 
     for (let i = this.pending.length - 1; i >= 0; i--) {
       this.pending[i]! -= dt;
       if (this.pending[i]! > 0) continue;
       this.pending.splice(i, 1);
       const sp = chooseSpecies(this.rng, phase, this.bugs);
-      if (sp) this.bugs.push(spawnBug(sp, world, this.rng, false));
+      if (sp && this.bugs.length < target * MAX_OVERFLOW) this.bugs.push(spawnBug(sp, world, this.rng, false));
       else this.scheduleRespawn();
     }
   }
