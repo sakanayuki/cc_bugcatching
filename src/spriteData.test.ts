@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { SPECIES } from './bugs';
+import { BUG_SCALE } from './config';
 import { BUG_SPRITES, HERO_FEET_ROW, HERO_SPRITE, MUTE_SPRITE, type SpriteDef } from './spriteData';
 
 function checkSprite(name: string, def: SpriteDef): void {
@@ -22,8 +23,8 @@ describe('ドット絵定義', () => {
       const def = BUG_SPRITES[sp.id];
       expect(def, sp.id).toBeDefined();
       checkSprite(sp.id, def!);
-      expect(def!.frames[0]!.length, `${sp.id} height`).toBe(sp.height);
-      expect(def!.frames[0]![0]!.length, `${sp.id} width`).toBe(sp.width);
+      expect(def!.frames[0]!.length * BUG_SCALE, `${sp.id} height`).toBe(sp.height);
+      expect(def!.frames[0]![0]!.length * BUG_SCALE, `${sp.id} width`).toBe(sp.width);
       expect(def!.frames.length).toBeGreaterThanOrEqual(2);
     }
   });

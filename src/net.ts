@@ -53,8 +53,8 @@ export function netPose(state: NetState): Pose {
       return { angle: windupAngle(chargeRatio(state.t)), length: NET.restLength - 4 * chargeRatio(state.t) };
     case 'swinging': {
       const p = clamp01(state.t / state.duration);
-      // 最初の 4 割で真上へ向き直り、長さは減速しながら到達点まで伸びる
-      const turn = easeOutQuad(clamp01(p / 0.4));
+      // 最初の 3 割で真上へ向き直り、長さは減速しながら到達点まで伸びる
+      const turn = easeOutQuad(clamp01(p / 0.3));
       return {
         angle: lerp(state.startAngle, -90, turn),
         length: lerp(NET.restLength, state.reach, easeOutQuad(p)),

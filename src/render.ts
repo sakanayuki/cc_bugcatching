@@ -3,7 +3,7 @@ import type { Backgrounds } from './background';
 import { fillCircle } from './background';
 import type { Bug } from './behavior';
 import { SPECIES } from './bugs';
-import { CATCH, NET, RESULT_INPUT_DELAY, TERRAIN, TIME, UI, VIEW } from './config';
+import { BUG_SCALE, CATCH, NET, RESULT_INPUT_DELAY, TERRAIN, TIME, UI, VIEW } from './config';
 import type { Game } from './game';
 import type { Layout } from './layout';
 import { netPose, reachFor, ringCenter } from './net';
@@ -99,18 +99,20 @@ export class Renderer {
   private drawBug(bug: Bug, night: number, time: number): void {
     const ctx = this.ctx;
     const sp = this.sprites.bugs[bug.species.id]!;
-    const x = Math.round(bug.x - sp.width / 2);
-    const y = Math.round(bug.y - sp.height / 2);
+    const w = sp.width * BUG_SCALE;
+    const h = sp.height * BUG_SCALE;
+    const x = Math.round(bug.x - w / 2);
+    const y = Math.round(bug.y - h / 2);
     if (bug.species.id === 'hotaru') {
       const pulse = 0.5 + 0.5 * Math.sin(time * 4 + bug.uid);
       ctx.save();
       ctx.globalCompositeOperation = 'lighter';
       ctx.globalAlpha = (0.25 + 0.45 * night) * (0.4 + 0.6 * pulse);
-      fillCircle(ctx, '#6a7a10', bug.x, bug.y + 3, 12);
-      fillCircle(ctx, '#a8b820', bug.x, bug.y + 3, 7);
+      fillCircle(ctx, '#6a7a10', bug.x, bug.y + 6, 24);
+      fillCircle(ctx, '#a8b820', bug.x, bug.y + 6, 14);
       ctx.restore();
     }
-    ctx.drawImage(this.frame(sp, bug), x, y);
+    ctx.drawImage(this.frame(sp, bug), x, y, w, h);
   }
 
   private drawBugs(game: Game, time: number): void {
@@ -143,7 +145,9 @@ export class Renderer {
       if (game.caughtBug) {
         const sp = this.sprites.bugs[game.caughtBug.species.id]!;
         const wob = game.play === 'freeze' ? Math.round(Math.sin(time * 40)) : 0;
-        ctx.drawImage(sp.frames[0]!, Math.round(ring.x - sp.width / 2) + wob, Math.round(ring.y - sp.height / 2));
+        const w = sp.width * BUG_SCALE;
+        const h = sp.height * BUG_SCALE;
+        ctx.drawImage(sp.frames[0]!, Math.round(ring.x - w / 2) + wob, Math.round(ring.y - h / 2), w, h);
       }
       ctx.fillStyle = 'rgba(255,255,255,0.35)';
       for (let i = -r + 3; i < r - 2; i += 4) {

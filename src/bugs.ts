@@ -104,7 +104,7 @@ export interface Species {
   id: string;
   name: string;
   points: number;
-  /** 見た目のサイズ（スプライトと一致させる） */
+  /** 画面上の見た目のサイズ（スプライトのサイズ × BUG_SCALE） */
   width: number;
   height: number;
   /** 時間帯ごとの出現の重み（0 ならその時間帯には出ない） */
@@ -122,8 +122,8 @@ export const SPECIES: readonly Species[] = [
     id: 'dangomushi',
     name: 'ダンゴムシ',
     points: 10,
-    width: 16,
-    height: 16,
+    width: 32,
+    height: 32,
     weights: { day: 26, dusk: 8, night: 0 },
     behavior: {
       pattern: 'walk',
@@ -143,8 +143,8 @@ export const SPECIES: readonly Species[] = [
     id: 'tentoumushi',
     name: 'テントウムシ',
     points: 15,
-    width: 16,
-    height: 16,
+    width: 32,
+    height: 32,
     weights: { day: 22, dusk: 8, night: 0 },
     behavior: {
       pattern: 'walk',
@@ -164,8 +164,8 @@ export const SPECIES: readonly Species[] = [
     id: 'monshirochou',
     name: 'モンシロチョウ',
     points: 20,
-    width: 16,
-    height: 16,
+    width: 32,
+    height: 32,
     weights: { day: 22, dusk: 6, night: 0 },
     behavior: {
       pattern: 'meander',
@@ -182,8 +182,8 @@ export const SPECIES: readonly Species[] = [
     id: 'batta',
     name: 'バッタ',
     points: 30,
-    width: 16,
-    height: 16,
+    width: 32,
+    height: 32,
     weights: { day: 16, dusk: 6, night: 0 },
     behavior: {
       pattern: 'hop',
@@ -201,8 +201,8 @@ export const SPECIES: readonly Species[] = [
     id: 'semi',
     name: 'セミ',
     points: 40,
-    width: 16,
-    height: 16,
+    width: 32,
+    height: 32,
     weights: { day: 14, dusk: 5, night: 0 },
     behavior: {
       pattern: 'perch',
@@ -220,8 +220,8 @@ export const SPECIES: readonly Species[] = [
     id: 'kamakiri',
     name: 'カマキリ',
     points: 50,
-    width: 16,
-    height: 16,
+    width: 32,
+    height: 32,
     weights: { day: 8, dusk: 9, night: 0 },
     behavior: {
       pattern: 'walk',
@@ -241,8 +241,8 @@ export const SPECIES: readonly Species[] = [
     id: 'ageha',
     name: 'アゲハ',
     points: 60,
-    width: 16,
-    height: 16,
+    width: 32,
+    height: 32,
     weights: { day: 8, dusk: 7, night: 0 },
     behavior: {
       pattern: 'meander',
@@ -259,8 +259,8 @@ export const SPECIES: readonly Species[] = [
     id: 'kabutomushi',
     name: 'カブトムシ',
     points: 100,
-    width: 16,
-    height: 16,
+    width: 32,
+    height: 32,
     weights: { day: 0, dusk: 10, night: 18 },
     behavior: {
       pattern: 'perch',
@@ -278,8 +278,8 @@ export const SPECIES: readonly Species[] = [
     id: 'nokogiri',
     name: 'ノコギリクワガタ',
     points: 120,
-    width: 16,
-    height: 16,
+    width: 32,
+    height: 32,
     weights: { day: 0, dusk: 8, night: 14 },
     behavior: {
       pattern: 'perch',
@@ -297,8 +297,8 @@ export const SPECIES: readonly Species[] = [
     id: 'miyama',
     name: 'ミヤマクワガタ',
     points: 150,
-    width: 16,
-    height: 16,
+    width: 32,
+    height: 32,
     weights: { day: 0, dusk: 3, night: 5 },
     maxOnScreen: 1,
     behavior: {
@@ -317,8 +317,8 @@ export const SPECIES: readonly Species[] = [
     id: 'hotaru',
     name: 'ホタル',
     points: 80,
-    width: 16,
-    height: 16,
+    width: 32,
+    height: 32,
     weights: { day: 0, dusk: 0, night: 20 },
     behavior: {
       pattern: 'hover',
@@ -335,33 +335,33 @@ export const SPECIES: readonly Species[] = [
     id: 'oniyanma',
     name: 'オニヤンマ',
     points: 180,
-    width: 24,
-    height: 16,
+    width: 48,
+    height: 32,
     weights: { day: 4, dusk: 5, night: 0 },
     maxOnScreen: 1,
     behavior: {
       pattern: 'dash',
       band: SKY,
-      speed: 260,
+      speed: 190,
       stopChance: 0.7,
       stopTime: [0.35, 0.75],
       waveAmplitude: 6,
       stay: [8, 8],
-      leaveSpeed: 260,
+      leaveSpeed: 190,
     },
   },
   {
     id: 'tamamushi',
     name: 'タマムシ',
     points: 200,
-    width: 16,
-    height: 16,
+    width: 32,
+    height: 32,
     weights: { day: 0, dusk: 3, night: 0 },
     maxOnScreen: 1,
     behavior: {
       pattern: 'zigzag',
       band: { top: 110, bottom: 420 },
-      speed: 150,
+      speed: 120,
       turnInterval: [0.25, 0.6],
       turnAngle: [60, 140],
       stay: [4.5, 6.5],
@@ -372,8 +372,8 @@ export const SPECIES: readonly Species[] = [
     id: 'ookuwagata',
     name: 'オオクワガタ',
     points: 300,
-    width: 16,
-    height: 16,
+    width: 32,
+    height: 32,
     weights: { day: 0, dusk: 0, night: 1.6 },
     maxOnScreen: 1,
     behavior: {

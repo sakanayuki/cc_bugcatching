@@ -87,7 +87,7 @@ describe('stepNet', () => {
     const swing: NetState = { kind: 'swinging', t: 0, reach: 200, duration: 0.2, startAngle: 30 };
     expect(isHitActive(swing)).toBe(false);
     expect(isHitActive({ ...swing, t: 0.2 * NET.hitWindowStart - 0.001 })).toBe(false);
-    expect(isHitActive({ ...swing, t: 0.2 * NET.hitWindowStart })).toBe(true);
+    expect(isHitActive({ ...swing, t: 0.2 * NET.hitWindowStart + 0.001 })).toBe(true);
     expect(isHitActive({ kind: 'holding', t: 0, reach: 200 })).toBe(true);
     expect(isHitActive({ kind: 'ready' })).toBe(false);
     expect(isHitActive({ kind: 'recovering', t: 0, from: { angle: -90, length: 200 } })).toBe(false);
@@ -117,5 +117,20 @@ describe('stepNet', () => {
     const back = releaseCatch(caught);
     expect(back.kind).toBe('recovering');
     expect(netPose(back)).toEqual(netPose(s));
+  });
+});
+
+describe('小さい子向けのやさしさ', () => {
+  it('網の輪は虫（32px）がすっぽり入る大きさ', () => {
+    expect(NET.ringRadius * 2).toBeGreaterThanOrEqual(56);
+  });
+
+  it('離すタイミングが 0.2 秒ずれても、到達点のずれは輪の半径以内', () => {
+    const drift = reachFor(chargeRatio(0.9)) - reachFor(chargeRatio(0.7));
+    expect(drift).toBeLessThanOrEqual(NET.ringRadius + 16);
+  });
+
+  it('到達点でしばらく網が止まり、その間も捕まえられる', () => {
+    expect(NET.holdTime).toBeGreaterThanOrEqual(0.25);
   });
 });

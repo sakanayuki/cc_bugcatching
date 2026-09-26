@@ -9,6 +9,7 @@ import type {
   WalkParams,
   ZigzagParams,
 } from './bugs';
+import { BUG_SPEED_SCALE } from './config';
 import { chance, pick, range, type Rng } from './rng';
 import { perchRange, type Trunk, type World } from './world';
 
@@ -457,7 +458,9 @@ function updateZigzag(bug: Bug, b: ZigzagParams, world: World, rng: Rng, dt: num
 }
 
 /** 1 ステップ分、虫を動かす */
-export function updateBug(bug: Bug, world: World, rng: Rng, dt: number): void {
+export function updateBug(bug: Bug, world: World, rng: Rng, realDt: number): void {
+  // 虫の時間だけゆっくり流す
+  const dt = realDt * BUG_SPEED_SCALE;
   bug.age += dt;
   if (!bug.leaving && bug.age >= bug.stayLimit) startLeaving(bug, world);
   const b = bug.species.behavior;
