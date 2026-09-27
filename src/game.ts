@@ -6,8 +6,8 @@ import { hitRadiusFor, pickCatch, rarityFor, summarize, type ResultRow } from '.
 import { CATCH, NET, RESULT_INPUT_DELAY, TERRAIN, TIME, VIBRATION } from './config';
 import type { Input, PressInfo } from './input';
 import {
-  aimRatio,
   catchAt,
+  chargeRatio,
   isHitActive,
   netPose,
   releaseCatch,
@@ -104,9 +104,9 @@ export class Game {
     return { x: Math.round(this.world.width / 2), y: TERRAIN.heroFeetY - 20 };
   }
 
-  /** 振りかぶり量（ゲージ量）。ゲージ表示中以外は 0 */
+  /** 振りかぶり量（溜め中のみ） */
   get charge(): number {
-    return aimRatio(this.net);
+    return this.net.kind === 'charging' ? chargeRatio(this.net.t) : 0;
   }
 
   resize(width: number): void {
@@ -136,8 +136,8 @@ export class Game {
     if (this.scene !== 'play' || this.play === 'paused') return;
     this.pausedFrom = this.play;
     this.setPlay('paused');
-    // 押した直後・ゲージ表示中は構えに戻す（再開時に勝手に振らないように）
-    if (this.net.kind === 'pressing' || this.net.kind === 'aiming') this.net = { kind: 'ready' };
+    // 溜め途中は構えに戻す（再開時に勝手に振らないように）
+    if (this.net.kind === 'charging') this.net = { kind: 'ready' };
   }
 
   private setScene(scene: Scene): void {
@@ -247,35 +247,33 @@ export class Game {
         }
         return;
       case 'run':
-        this.updateRun(dt, pressed);
+        this.updateRun(dt);
         return;
     }
   }
 
-  private updateRun(dt: number, pressed: boolean): void {
+  private updateRun(dt: number): void {
     this.remaining = Math.max(0, this.remaining - dt);
     const phase = phaseAt(this.elapsed);
     this.population.update(dt, phase);
 
     // 網
     const before = this.net;
-    const { state, event } = stepNet(this.net, dt, { pressed, held: this.input.held });
+    const { state, event } = stepNet(this.net, dt, this.input.held);
     this.net = state;
+    if (event === 'charge') this.fullNotified = false;
     if (event === 'swing') {
       this.sound.swing();
       vibrate(VIBRATION.swing);
     }
-    if (this.net.kind === 'aiming') {
-      // ゲージの上下に合わせて音程を変え、満タンで合図
-      const ratio = aimRatio(this.net);
+    if (this.net.kind === 'charging') {
+      const ratio = chargeRatio(this.net.t);
       this.sound.charge(ratio);
-      if (ratio >= 0.98 && !this.fullNotified) {
+      if (ratio >= 1 && !this.fullNotified) {
         this.fullNotified = true;
         this.sound.full();
-      } else if (ratio < 0.9) {
-        this.fullNotified = false;
       }
-    } else if (before.kind === 'aiming') {
+    } else if (before.kind === 'charging') {
       this.sound.stopCharge();
     }
     this.checkCatch(before);

@@ -28,10 +28,8 @@ export const MAX_FRAME_DT = 0.1;
 
 /** 虫取り網 */
 export const NET = {
-  /** この時間以内に離せばタップとみなし、すぐ近くへ網を振る（秒） */
-  tapTime: 0.2,
-  /** ゲージが 空 → 満タン → 空 と 1 往復する時間（秒） */
-  gaugePeriod: 2.0,
+  /** 最大まで振りかぶるのにかかる時間（秒） */
+  chargeTime: 2.0,
   /** 到達距離（網の支点から真上へ, px） */
   minReach: 40,
   maxReach: 460,
@@ -54,14 +52,6 @@ export const NET = {
   windupAngle: 35,
   /** 1 ロジックステップ内で判定を行う分割数（高速スイングのすり抜け防止） */
   hitSubsteps: 4,
-} as const;
-
-/** 少年の横に出すゲージの大きさ */
-export const GAUGE = {
-  width: 10,
-  height: 72,
-  /** 少年との間隔 */
-  gap: 6,
 } as const;
 
 /** 虫の当たり判定は見た目の何割か（3 歳児向けに見た目いっぱいまで） */

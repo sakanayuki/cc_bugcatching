@@ -3,7 +3,7 @@ import type { Backgrounds } from './background';
 import { fillCircle } from './background';
 import type { Bug } from './behavior';
 import { SPECIES } from './bugs';
-import { BUG_SCALE, CATCH, GAUGE, NET, SPAWN, RESULT_INPUT_DELAY, TERRAIN, TIME, UI, VIEW } from './config';
+import { BUG_SCALE, CATCH, NET, SPAWN, RESULT_INPUT_DELAY, TERRAIN, TIME, UI, VIEW } from './config';
 import type { Game } from './game';
 import type { Layout } from './layout';
 import { netPose, reachFor, ringCenter } from './net';
@@ -195,11 +195,11 @@ export class Renderer {
   }
 
   private drawAim(game: Game): void {
-    if (game.net.kind !== 'aiming') return;
+    if (game.net.kind !== 'charging') return;
     const ratio = game.charge;
     const pivot = game.pivot;
     const y = pivot.y - reachFor(ratio);
-    const full = ratio >= 0.98;
+    const full = ratio >= 1;
     this.ctx.save();
     this.ctx.globalAlpha = full ? 0.85 : 0.55;
     ringOutline(this.ctx, full ? '#ffe040' : '#ffffff', pivot.x, y, NET.ringRadius, 1, true);
@@ -248,7 +248,6 @@ export class Renderer {
       const net = this.drawNet(game, time);
       if (net.behind) net.draw();
       this.drawHero(game);
-      this.drawGauge(game, time);
       if (!net.behind) net.draw();
     }
     ctx.restore();
@@ -296,41 +295,10 @@ export class Renderer {
     text(this.ctx, `${game.score}pt`, right, top + 4, { align: 'right', color: '#fff6a0' });
   }
 
-  /** 少年の横のゲージ。もう一度押した時点の量で網の届く距離が決まる */
-  private drawGauge(game: Game, time: number): void {
-    if (game.net.kind !== 'aiming') return;
-    const ctx = this.ctx;
-    const ratio = game.charge;
-    const full = ratio >= 0.98;
-    const w = GAUGE.width;
-    const h = GAUGE.height;
-    const x = Math.round(game.world.width / 2 - this.sprites.hero.width / 2 - GAUGE.gap - w);
-    const bottom = TERRAIN.heroFeetY;
-    const top = bottom - h;
-    ctx.fillStyle = '#16121c';
-    ctx.fillRect(x - 2, top - 2, w + 4, h + 4);
-    ctx.fillStyle = '#3a3448';
-    ctx.fillRect(x, top, w, h);
-    const fill = Math.round((h - 2) * ratio);
-    // 下は白、上ほど黄色
-    for (let i = 0; i < fill; i++) {
-      const t = i / (h - 2);
-      ctx.fillStyle = full ? '#ffe040' : t < 0.5 ? '#ffffff' : t < 0.8 ? '#fff4a0' : '#ffe040';
-      ctx.fillRect(x + 1, bottom - 1 - i - 1, w - 2, 1);
-    }
-    // 目盛り
-    ctx.fillStyle = '#16121c';
-    for (const m of [0.25, 0.5, 0.75]) ctx.fillRect(x, Math.round(bottom - h * m), 3, 1);
-    if (Math.floor(time * 4) % 2 === 0) {
-      text(ctx, 'タップ!', x + w / 2, top - 20, { size: 12, align: 'center', color: '#ffe040' });
-    }
-  }
-
   private drawButton(game: Game, cx: number, cy: number): void {
     const ctx = this.ctx;
     const r = UI.buttonRadius;
-    const aiming = game.net.kind === 'aiming';
-    const pressed = game.net.kind === 'pressing' || aiming;
+    const pressed = game.net.kind === 'charging';
     const ready = game.net.kind === 'ready' || pressed;
     ctx.save();
     ctx.globalAlpha = 0.85;
@@ -338,10 +306,10 @@ export class Renderer {
     fillCircle(ctx, pressed ? '#c84a3a' : ready ? '#e8604a' : '#7a5a50', cx, cy, r);
     fillCircle(ctx, pressed ? '#a83a2e' : ready ? '#f88a6a' : '#8a6a60', cx, cy - 3, r - 6);
     ctx.restore();
-    if (aiming) {
-      // ゲージ量のリング
+    if (pressed) {
+      // 溜め量のリング
       const ratio = game.charge;
-      ctx.fillStyle = ratio >= 0.98 ? '#ffe040' : '#ffffff';
+      ctx.fillStyle = ratio >= 1 ? '#ffe040' : '#ffffff';
       const steps = Math.ceil(2 * Math.PI * (r + 5) * ratio);
       for (let i = 0; i < steps; i++) {
         const a = -Math.PI / 2 + (i / (2 * Math.PI * (r + 5))) * Math.PI * 2;
@@ -364,8 +332,8 @@ export class Renderer {
     text(ctx, 'なつの ぞうきばやし で むしを つかまえよう', cx, oy + 228, { size: 12, align: 'center' });
     if (Math.floor(time * 2) % 2 === 0) text(ctx, 'TAP TO START', cx, oy + 380, { align: 'center', size: 16 });
     text(ctx, `HI-SCORE ${game.highScore}pt`, cx, oy + 410, { align: 'center', color: '#fff6a0' });
-    text(ctx, 'タップで すぐ ちかくに あみを ふる', cx, oy + 596, { size: 12, align: 'center' });
-    text(ctx, 'ながおしで ゲージ → もういちど タップで とおくへ', cx, oy + 614, { size: 12, align: 'center' });
+    text(ctx, 'ながおしで ふりかぶり、はなして あみを ふる', cx, oy + 596, { size: 12, align: 'center' });
+    text(ctx, 'ながく ためるほど とおくまで とどく', cx, oy + 614, { size: 12, align: 'center' });
   }
 
   private drawGet(game: Game, layout: Layout, time: number): void {

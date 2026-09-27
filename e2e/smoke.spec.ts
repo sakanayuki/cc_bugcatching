@@ -15,7 +15,7 @@ async function state(page: Page): Promise<DebugGame> {
   });
 }
 
-test('タイトル → プレイ → タップとゲージで網を振る', async ({ page }) => {
+test('タイトル → プレイ → 網を振る', async ({ page }) => {
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(e.message));
 
@@ -35,20 +35,13 @@ test('タイトル → プレイ → タップとゲージで網を振る', asyn
   // スタートのタップは網操作にならない
   expect((await state(page)).net.kind).toBe('ready');
 
-  // タップですぐ振る
-  await page.mouse.click(cx, cy);
-  await expect.poll(async () => (await state(page)).net.kind).not.toBe('ready');
-  await expect.poll(async () => (await state(page)).net.kind).not.toMatch(/pressing|aiming/);
-  await expect.poll(async () => (await state(page)).net.kind, { timeout: 5000 }).toBe('ready');
-
-  // 長押しでゲージ表示 → 離してもそのまま → もう一度タップで振る
+  // 長押し → 離す で網を振る
+  await page.mouse.move(cx, cy);
   await page.mouse.down();
-  await expect.poll(async () => (await state(page)).net.kind).toBe('aiming');
+  await expect.poll(async () => (await state(page)).net.kind).toBe('charging');
+  await page.waitForTimeout(400);
   await page.mouse.up();
-  await page.waitForTimeout(300);
-  expect((await state(page)).net.kind).toBe('aiming');
-  await page.mouse.click(cx, cy);
-  await expect.poll(async () => (await state(page)).net.kind).not.toBe('aiming');
+  await expect.poll(async () => (await state(page)).net.kind).not.toBe('charging');
 
   // 時間が進んでいる
   await page.waitForTimeout(1500);
@@ -64,10 +57,9 @@ test('スペースキーでも操作できる', async ({ page }) => {
   await page.keyboard.press('Space');
   await expect.poll(async () => (await state(page)).scene).toBe('play');
   await page.keyboard.down('Space');
-  await expect.poll(async () => (await state(page)).net.kind).toBe('aiming');
+  await expect.poll(async () => (await state(page)).net.kind).toBe('charging');
   await page.keyboard.up('Space');
-  await page.keyboard.press('Space');
-  await expect.poll(async () => (await state(page)).net.kind).not.toBe('aiming');
+  await expect.poll(async () => (await state(page)).net.kind).not.toBe('charging');
 });
 
 test('画面の縦横比に応じて森の幅が変わる', async ({ page }) => {
