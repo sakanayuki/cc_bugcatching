@@ -3,7 +3,7 @@ import { NET } from './config';
 import {
   acceptsInput,
   catchAt,
-  gaugeRatio,
+  chargeRatio,
   isHitActive,
   netPose,
   reachFor,
@@ -11,37 +11,31 @@ import {
   ringCenter,
   stepNet,
   swingDuration,
-  type NetInput,
   type NetState,
 } from './net';
 
 const DT = 1 / 120;
-const IDLE = { pressed: false, held: false };
-const HOLD = { pressed: false, held: true };
-const PRESS = { pressed: true, held: true };
 
-function run(state: NetState, seconds: number, input: NetInput): { state: NetState; events: string[] } {
+function run(state: NetState, seconds: number, held: boolean): { state: NetState; events: string[] } {
   const events: string[] = [];
   let s = state;
   for (let t = 0; t < seconds - 1e-9; t += DT) {
-    const r = stepNet(s, DT, input);
+    const r = stepNet(s, DT, held);
     s = r.state;
     if (r.event) events.push(r.event);
   }
   return { state: s, events };
 }
 
-describe('ゲージと到達距離', () => {
-  it('ゲージは 空 → 満タン → 空 と往復する', () => {
-    expect(gaugeRatio(0)).toBe(0);
-    expect(gaugeRatio(NET.gaugePeriod / 4)).toBeCloseTo(0.5);
-    expect(gaugeRatio(NET.gaugePeriod / 2)).toBeCloseTo(1);
-    expect(gaugeRatio((NET.gaugePeriod * 3) / 4)).toBeCloseTo(0.5);
-    expect(gaugeRatio(NET.gaugePeriod)).toBeCloseTo(0);
-    expect(gaugeRatio(NET.gaugePeriod * 1.5)).toBeCloseTo(1);
+describe('振りかぶりと到達距離', () => {
+  it('押している時間に比例して振りかぶり量が増え、最大で頭打ち', () => {
+    expect(chargeRatio(0)).toBe(0);
+    expect(chargeRatio(NET.chargeTime / 2)).toBeCloseTo(0.5);
+    expect(chargeRatio(NET.chargeTime)).toBe(1);
+    expect(chargeRatio(NET.chargeTime * 5)).toBe(1);
   });
 
-  it('ゲージが少ないと近く、多いと遠くまで届く', () => {
+  it('短い長押しは近く、長い長押しは遠くまで届く', () => {
     expect(reachFor(0)).toBe(NET.minReach);
     expect(reachFor(1)).toBe(NET.maxReach);
     expect(reachFor(0.5)).toBeGreaterThan(reachFor(0.2));
@@ -55,62 +49,38 @@ describe('ゲージと到達距離', () => {
 });
 
 describe('stepNet', () => {
-  it('タップ（tapTime 以内に離す）ならすぐ最小距離へ振る', () => {
-    let s = stepNet({ kind: 'ready' }, DT, PRESS);
-    expect(s.event).toBe('press');
-    s = stepNet(s.state, DT, HOLD);
-    s = stepNet(s.state, DT, IDLE);
-    expect(s.event).toBe('swing');
-    expect(s.state.kind).toBe('swinging');
-    if (s.state.kind === 'swinging') expect(s.state.reach).toBe(NET.minReach);
-    const done = run(s.state, NET.maxSwingTime + NET.holdTime + NET.recoverTime + 0.05, IDLE);
-    expect(done.state.kind).toBe('ready');
-  });
-
-  it('tapTime を過ぎて押していればゲージ表示になり、離しても振らない', () => {
-    let { state } = run(stepNet({ kind: 'ready' }, DT, PRESS).state, NET.tapTime + 0.05, HOLD);
-    expect(state.kind).toBe('aiming');
-    // 離してもゲージのまま待つ
-    ({ state } = run(state, 1.5, IDLE));
-    expect(state.kind).toBe('aiming');
-  });
-
-  it('長押しが途中で途切れても（tapTime 後）ゲージ表示のまま待つ', () => {
-    let { state } = run(stepNet({ kind: 'ready' }, DT, PRESS).state, NET.tapTime + 0.02, HOLD);
-    expect(state.kind).toBe('aiming');
-    ({ state } = run(state, 0.1, IDLE));
-    expect(state.kind).toBe('aiming');
-  });
-
-  it('ゲージ表示中にもう一度押すと、その時点のゲージ量で振る', () => {
-    const aiming: NetState = { kind: 'aiming', t: NET.gaugePeriod / 2 };
-    const r = stepNet(aiming, DT, PRESS);
+  it('長押し → 離す で振り、到達点で止まってから構えに戻る', () => {
+    let { state, events } = run({ kind: 'ready' }, 0.5, true);
+    expect(state.kind).toBe('charging');
+    expect(events).toEqual(['charge']);
+    const heldFor = state.kind === 'charging' ? state.t : NaN;
+    expect(heldFor).toBeCloseTo(0.5, 1);
+    const r = stepNet(state, DT, false);
     expect(r.event).toBe('swing');
-    expect(r.state.kind).toBe('swinging');
-    if (r.state.kind === 'swinging') expect(r.state.reach).toBeCloseTo(NET.maxReach);
-    const half = stepNet({ kind: 'aiming', t: NET.gaugePeriod / 4 }, DT, PRESS).state;
-    if (half.kind === 'swinging') expect(half.reach).toBeCloseTo(reachFor(0.5));
+    state = r.state;
+    expect(state.kind).toBe('swinging');
+    if (state.kind === 'swinging') expect(state.reach).toBeCloseTo(reachFor(chargeRatio(heldFor)));
+    ({ state } = run(state, NET.maxSwingTime + NET.holdTime + NET.recoverTime + 0.05, false));
+    expect(state.kind).toBe('ready');
   });
 
   it('振っている最中と硬直中は入力を受け付けない', () => {
-    const swing = stepNet({ kind: 'aiming', t: 0.3 }, DT, PRESS).state;
-    expect(acceptsInput(swing)).toBe(false);
-    let s = swing;
-    const events: string[] = [];
-    for (let t = 0; t < 0.3; t += DT) {
-      const r = stepNet(s, DT, PRESS);
-      s = r.state;
-      if (r.event) events.push(r.event);
-    }
-    expect(events).not.toContain('press');
-    expect(s.kind).not.toBe('pressing');
+    let { state } = run({ kind: 'ready' }, 0.3, true);
+    state = stepNet(state, DT, false).state;
+    expect(acceptsInput(state)).toBe(false);
+    // スイング中に押しても溜めに移らない
+    const r = run(state, 0.1, true);
+    expect(r.state.kind).not.toBe('charging');
+    expect(r.events).not.toContain('charge');
   });
 
-  it('振り終わったら押しっぱなしでは次の操作にならず、新しく押す必要がある', () => {
-    const swing = stepNet({ kind: 'aiming', t: 0.3 }, DT, PRESS).state;
-    const { state } = run(swing, 1.0, HOLD);
-    expect(state.kind).toBe('ready');
-    expect(stepNet(state, DT, PRESS).state.kind).toBe('pressing');
+  it('硬直明けに押し続けていれば、その時点から溜め始める', () => {
+    let { state } = run({ kind: 'ready' }, 0.2, true);
+    state = stepNet(state, DT, false).state;
+    const r = run(state, 1.0, true);
+    expect(r.state.kind).toBe('charging');
+    // 溜めは準備が整ってから数えるので、押していた時間より短い
+    if (r.state.kind === 'charging') expect(r.state.t).toBeLessThan(0.6);
   });
 
   it('判定は振り下ろしの後半と到達点での静止中のみ', () => {
@@ -143,7 +113,7 @@ describe('stepNet', () => {
     const s: NetState = { kind: 'holding', t: 0, reach: 300 };
     const caught = catchAt(s);
     expect(caught.kind).toBe('caught');
-    expect(stepNet(caught, 1, PRESS).state).toBe(caught);
+    expect(stepNet(caught, 1, true).state).toBe(caught);
     const back = releaseCatch(caught);
     expect(back.kind).toBe('recovering');
     expect(netPose(back)).toEqual(netPose(s));
@@ -155,13 +125,9 @@ describe('小さい子向けのやさしさ', () => {
     expect(NET.ringRadius * 2).toBeGreaterThanOrEqual(56);
   });
 
-  it('ゲージを押すタイミングが 0.1 秒ずれても、到達点のずれは輪と虫の判定の範囲内', () => {
-    const drift = reachFor(gaugeRatio(0.6)) - reachFor(gaugeRatio(0.5));
+  it('離すタイミングが 0.2 秒ずれても、到達点のずれは輪の半径以内', () => {
+    const drift = reachFor(chargeRatio(0.9)) - reachFor(chargeRatio(0.7));
     expect(drift).toBeLessThanOrEqual(NET.ringRadius + 16);
-  });
-
-  it('タップの判定時間は 0.2 秒', () => {
-    expect(NET.tapTime).toBe(0.2);
   });
 
   it('到達点でしばらく網が止まり、その間も捕まえられる', () => {

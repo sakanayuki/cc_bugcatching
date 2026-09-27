@@ -8,24 +8,13 @@ export interface Pose {
 
 export type NetState =
   | { kind: 'ready' }
-  /** 押した直後。tapTime 以内に離せばタップ、過ぎればゲージ表示へ */
-  | { kind: 'pressing'; t: number }
-  /** ゲージ表示中。もう一度押すとその時点のゲージ量で振る */
-  | { kind: 'aiming'; t: number }
+  | { kind: 'charging'; t: number }
   | { kind: 'swinging'; t: number; reach: number; duration: number; startAngle: number }
   | { kind: 'holding'; t: number; reach: number }
   | { kind: 'caught'; pose: Pose }
   | { kind: 'recovering'; t: number; from: Pose };
 
-export type NetEvent = 'press' | 'aim' | 'swing' | 'ready' | null;
-
-/** 1 ステップ分の入力 */
-export interface NetInput {
-  /** このステップで新しく押されたか */
-  pressed: boolean;
-  /** 押し続けているか */
-  held: boolean;
-}
+export type NetEvent = 'charge' | 'swing' | 'ready' | null;
 
 export const READY_POSE: Pose = { angle: NET.readyAngle, length: NET.restLength };
 
@@ -34,15 +23,9 @@ const clamp01 = (t: number) => Math.min(1, Math.max(0, t));
 const easeOutQuad = (t: number) => 1 - (1 - t) * (1 - t);
 const easeInOut = (t: number) => (t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2);
 
-/** ゲージ表示からの経過時間 → ゲージ量 [0, 1]。空と満タンを往復する */
-export function gaugeRatio(t: number): number {
-  const phase = (((t % NET.gaugePeriod) + NET.gaugePeriod) % NET.gaugePeriod) / NET.gaugePeriod;
-  return phase < 0.5 ? phase * 2 : 2 - phase * 2;
-}
-
-/** 現在の振りかぶり量（ゲージ量）。押した直後は 0 */
-export function aimRatio(state: NetState): number {
-  return state.kind === 'aiming' ? gaugeRatio(state.t) : 0;
+/** 押していた時間 → 振りかぶり量 [0, 1]。最大に達したらそれ以上増えない */
+export function chargeRatio(heldTime: number): number {
+  return clamp01(heldTime / NET.chargeTime);
 }
 
 /** 振りかぶり量 → 到達距離 */
@@ -66,11 +49,8 @@ export function netPose(state: NetState): Pose {
   switch (state.kind) {
     case 'ready':
       return READY_POSE;
-    case 'pressing':
-    case 'aiming': {
-      const ratio = aimRatio(state);
-      return { angle: windupAngle(ratio), length: NET.restLength - 4 * ratio };
-    }
+    case 'charging':
+      return { angle: windupAngle(chargeRatio(state.t)), length: NET.restLength - 4 * chargeRatio(state.t) };
     case 'swinging': {
       const p = clamp01(state.t / state.duration);
       // 最初の 3 割で真上へ向き直り、長さは減速しながら到達点まで伸びる
@@ -108,33 +88,31 @@ export function isHitActive(state: NetState): boolean {
 
 /** 新しい入力（溜め開始）を受け付けられるか */
 export function acceptsInput(state: NetState): boolean {
-  return state.kind === 'ready' || state.kind === 'pressing' || state.kind === 'aiming';
-}
-
-function swingTo(ratio: number): NetState {
-  const reach = reachFor(ratio);
-  return { kind: 'swinging', t: 0, reach, duration: swingDuration(reach), startAngle: windupAngle(ratio) };
+  return state.kind === 'ready' || state.kind === 'charging';
 }
 
 /**
- * 1 ステップ進める。
- * - tapTime 以内に離す（タップ）: すぐ最小距離へ網を振る
- * - tapTime を過ぎても押している: ゲージ表示に切り替わり、もう一度押した時点のゲージ量で振る
- *   （長押しを離したかどうかは問わない。長押しが途中で途切れる端末でも操作できるように）
+ * 1 ステップ進める。held は「網操作として有効な押下が続いているか」。
+ * 硬直明けに押し続けていれば、その時点から溜めを始める。
  */
-export function stepNet(state: NetState, dt: number, input: NetInput): { state: NetState; event: NetEvent } {
+export function stepNet(state: NetState, dt: number, held: boolean): { state: NetState; event: NetEvent } {
   switch (state.kind) {
     case 'ready':
-      return input.pressed ? { state: { kind: 'pressing', t: 0 }, event: 'press' } : { state, event: null };
-    case 'pressing': {
-      const t = state.t + dt;
-      if (!input.held && t <= NET.tapTime) return { state: swingTo(0), event: 'swing' };
-      if (t > NET.tapTime) return { state: { kind: 'aiming', t: 0 }, event: 'aim' };
-      return { state: { kind: 'pressing', t }, event: null };
+      return held ? { state: { kind: 'charging', t: 0 }, event: 'charge' } : { state, event: null };
+    case 'charging': {
+      if (held) return { state: { kind: 'charging', t: state.t + dt }, event: null };
+      const reach = reachFor(chargeRatio(state.t));
+      return {
+        state: {
+          kind: 'swinging',
+          t: 0,
+          reach,
+          duration: swingDuration(reach),
+          startAngle: windupAngle(chargeRatio(state.t)),
+        },
+        event: 'swing',
+      };
     }
-    case 'aiming':
-      if (input.pressed) return { state: swingTo(gaugeRatio(state.t)), event: 'swing' };
-      return { state: { kind: 'aiming', t: state.t + dt }, event: null };
     case 'swinging': {
       const t = state.t + dt;
       if (t < state.duration) return { state: { ...state, t }, event: null };
@@ -150,6 +128,7 @@ export function stepNet(state: NetState, dt: number, input: NetInput): { state: 
     case 'recovering': {
       const t = state.t + dt;
       if (t < NET.recoverTime) return { state: { ...state, t }, event: null };
+      if (held) return { state: { kind: 'charging', t: 0 }, event: 'charge' };
       return { state: { kind: 'ready' }, event: 'ready' };
     }
   }
