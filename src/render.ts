@@ -14,7 +14,17 @@ import type { BakedSprite, Sprites } from './sprites';
 type Ctx = CanvasRenderingContext2D;
 
 /** 左右反転して描く横向きの虫 */
-const SIDE_VIEW = new Set(['dangomushi', 'tentoumushi', 'batta', 'kamakiri', 'oniyanma']);
+const SIDE_VIEW = new Set([
+  'dangomushi',
+  'tentoumushi',
+  'batta',
+  'kamakiri',
+  'oniyanma',
+  'shiokara',
+  'akiakane',
+  'koorogi',
+  'suzumushi',
+]);
 
 /** 画面端のセーフエリア（内部座標） */
 export interface Insets {
@@ -458,7 +468,8 @@ export class Renderer {
 
     const pw = Math.min(vw - 16, 400);
     const left = cx - pw / 2;
-    const rowH = 26;
+    // 種類が増えても画面内に収まるよう行の高さを詰める
+    const rowH = Math.min(26, Math.floor(440 / res.rows.length));
     let y = oy + 150;
     for (const row of res.rows) {
       const sp = SPECIES.find((s) => s.id === row.id)!;

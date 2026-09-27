@@ -343,6 +343,93 @@ const tamamushiB = variant(tamamushiA, {
   10: '..wkgrgGGgrgkw..',
 });
 
+const shiokaraA = [
+  E24,
+  E24,
+  E24,
+  E24,
+  '..........wwww..wwww....',
+  '...........wwww.wwww....',
+  '............wwwwwww.gg..',
+  '..............kddk.kggk.',
+  'kkkbbbbbbbbbbbbbkddkggk.',
+  '..............kddk.kggk.',
+  '............wwwwwww.gg..',
+  '...........wwww.wwww....',
+  '..........wwww..wwww....',
+  E24,
+  E24,
+  E24,
+];
+const shiokaraB = variant(shiokaraA, {
+  4: '...........wwww.wwww....',
+  5: '..........wwwww.wwww....',
+  11: '..........wwwww.wwww....',
+  12: '...........wwww.wwww....',
+});
+
+const akiakaneA = [
+  E24,
+  E24,
+  E24,
+  E24,
+  '..........wwww..wwww....',
+  '...........wwww.wwww....',
+  '............wwwwwww.ee..',
+  '..............kook.keek.',
+  'krrrrrrrrrrrrrrrkookeek.',
+  '..............kook.keek.',
+  '............wwwwwww.ee..',
+  '...........wwww.wwww....',
+  '..........wwww..wwww....',
+  E24,
+  E24,
+  E24,
+];
+const akiakaneB = variant(akiakaneA, {
+  4: '...........wwww.wwww....',
+  5: '..........wwwww.wwww....',
+  11: '..........wwwww.wwww....',
+  12: '...........wwww.wwww....',
+});
+
+const koorogiA = pad16(
+  [
+    '............k..k',
+    '...........k..k.',
+    '..kkkkkkkkkkk...',
+    '.kbbbbbbbbbbbek.',
+    'kbhbbbbbbbbbbbk.',
+    '.kkkkkkkkkkkkk..',
+    '..kk.k....k.k...',
+    '.k...k.....k.k..',
+  ],
+  6,
+);
+const koorogiB = variant(koorogiA, {
+  12: 'kk..........k...',
+  13: 'k...............',
+});
+
+const suzumushiA = pad16(
+  [
+    '.............k..',
+    '............k...',
+    '...kkkkkkkkk....',
+    '..kwwwwwwwwbk...',
+    '.kwwwwwwwwbbek..',
+    '.kbbbbbbbbbbbk..',
+    '..kkkkkkkkkkk...',
+    '...k.k...k.k....',
+  ],
+  6,
+);
+const suzumushiB = variant(suzumushiA, {
+  8: '..kkkkkkkkk.....',
+  9: '.kwwwwwwwwwbk...',
+  13: '..k.k...k.k.....',
+});
+
 /** 虫のスプライト（id は bugs.ts の Species.id と一致させる） */
 export const BUG_SPRITES: Record<string, SpriteDef> = {
   dangomushi: {
@@ -392,6 +479,22 @@ export const BUG_SPRITES: Record<string, SpriteDef> = {
   oniyanma: {
     palette: { k: '#111111', y: '#f2d02a', g: '#3fbf5a', w: '#cfe8f0' },
     frames: [oniyanmaA, oniyanmaB],
+  },
+  shiokara: {
+    palette: { k: '#111111', b: '#8ab8d8', d: '#2a3a4a', g: '#3a8ad0', w: '#dcecf4' },
+    frames: [shiokaraA, shiokaraB],
+  },
+  akiakane: {
+    palette: { k: '#2a0c08', r: '#e04028', o: '#b0502a', e: '#c83020', w: '#f0e4d0' },
+    frames: [akiakaneA, akiakaneB],
+  },
+  koorogi: {
+    palette: { k: '#120c0a', b: '#3a2a20', h: '#6a4a30', e: '#d8c070' },
+    frames: [koorogiA, koorogiB],
+  },
+  suzumushi: {
+    palette: { k: '#0c0a08', b: '#2a2418', w: '#c8c0a0', e: '#e0d8b0' },
+    frames: [suzumushiA, suzumushiB],
   },
   tamamushi: {
     palette: { k: '#0e2a1a', g: '#2fae5a', G: '#7ff0a0', r: '#d8402a', w: '#b0e8d0' },

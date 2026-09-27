@@ -7,7 +7,7 @@ import { createRng } from './rng';
 import { createWorld, perchRange } from './world';
 
 describe('虫種表', () => {
-  it('仕様どおりの 14 種と得点', () => {
+  it('仕様の 14 種＋追加の 4 種と得点', () => {
     const table: Record<string, number> = {
       dangomushi: 10,
       tentoumushi: 15,
@@ -23,10 +23,14 @@ describe('虫種表', () => {
       oniyanma: 180,
       tamamushi: 200,
       ookuwagata: 300,
+      shiokara: 70,
+      akiakane: 90,
+      koorogi: 60,
+      suzumushi: 110,
     };
-    expect(SPECIES).toHaveLength(14);
+    expect(SPECIES).toHaveLength(18);
     for (const s of SPECIES) expect(s.points, s.id).toBe(table[s.id]);
-    expect(new Set(SPECIES.map((s) => s.id)).size).toBe(14);
+    expect(new Set(SPECIES.map((s) => s.id)).size).toBe(18);
   });
 
   it('主な時間帯に合わせて出現する', () => {
@@ -35,7 +39,11 @@ describe('虫種表', () => {
     expect(only('hotaru').night).toBeGreaterThan(0);
     expect(only('ookuwagata')).toMatchObject({ day: 0, dusk: 0 });
     expect(only('tamamushi')).toMatchObject({ day: 0, night: 0 });
-    for (const id of ['kabutomushi', 'nokogiri', 'miyama']) expect(only(id).day, id).toBe(0);
+    for (const id of ['kabutomushi', 'nokogiri', 'miyama', 'koorogi', 'suzumushi']) expect(only(id).day, id).toBe(0);
+    expect(only('suzumushi')).toMatchObject({ dusk: 0 });
+    expect(only('koorogi').night).toBeGreaterThan(only('koorogi').dusk);
+    expect(only('akiakane').dusk).toBeGreaterThan(only('akiakane').day);
+    for (const id of ['shiokara', 'akiakane']) expect(only(id).night, id).toBe(0);
     for (const id of ['dangomushi', 'tentoumushi', 'monshirochou', 'batta', 'semi', 'kamakiri', 'ageha', 'oniyanma']) {
       expect(only(id).night, id).toBe(0);
       expect(only(id).day, id).toBeGreaterThan(0);
