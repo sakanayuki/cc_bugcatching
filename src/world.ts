@@ -27,7 +27,7 @@ export function createWorld(width: number): World {
   const seed = 0x5eed ^ width;
   const rng = createRng(seed);
   const cx = width / 2;
-  const trunks: Trunk[] = [{ x: Math.round(cx), width: 22, top: TERRAIN.trunkTop, bottom: TERRAIN.groundTop + 6 }];
+  const trunks: Trunk[] = [{ x: Math.round(cx), width: 30, top: TERRAIN.trunkTop, bottom: TERRAIN.groundTop + 6 }];
   for (let k = 1; ; k++) {
     let added = false;
     for (const dir of [-1, 1]) {
@@ -35,7 +35,7 @@ export function createWorld(width: number): World {
       if (x < 18 || x > width - 18) continue;
       trunks.push({
         x,
-        width: Math.round(range(rng, 16, 22)),
+        width: Math.round(range(rng, 26, 32)),
         top: TERRAIN.trunkTop + Math.round(range(rng, -20, 20)),
         bottom: TERRAIN.groundTop + Math.round(range(rng, 0, 10)),
       });
