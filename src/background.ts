@@ -250,7 +250,7 @@ function drawTreeLine(px: Pix, color: string, baseY: number, minH: number, maxH:
 
 /** 奥に並ぶ幹のシルエット（参考: 木々の間に見える平坦な暗い幹） */
 function drawBackTrunks(px: Pix, pal: Palette, world: World, rng: Rng): void {
-  const top = 80;
+  const top = 0;
   const bottom = TERRAIN.groundTop + 2;
   for (let x = range(rng, 0, 30); x < px.w; x += range(rng, 34, 56)) {
     // 手前の幹と重なる場所は省く
@@ -360,7 +360,8 @@ function drawTrunk(px: Pix, pal: Palette, phase: Phase, t: Trunk, seed: number):
   const lightLeft = phase === 'dusk';
   const flareH = 34;
   const bark = pal.bark;
-  for (let y = t.top; y < t.bottom; y++) {
+  // 幹は画面上端まで伸ばす（上の方は樹冠に隠れ、葉の隙間から見える）
+  for (let y = 0; y < t.bottom; y++) {
     const f = y > t.bottom - flareH ? ((y - (t.bottom - flareH)) / flareH) ** 2.2 : 0;
     const half = t.width / 2 + f * t.width * 0.7;
     const left = t.x - half;
@@ -398,12 +399,13 @@ function drawTrunk(px: Pix, pal: Palette, phase: Phase, t: Trunk, seed: number):
 
 /** 幹から樹冠へ伸びる太い枝 */
 function drawBranches(px: Pix, pal: Palette, t: Trunk, rng: Rng): void {
-  for (const dir of [-1, 1]) {
-    const n = randInt(rng, 1, 2);
-    for (let i = 0; i < n; i++) {
-      const sy = t.top + range(rng, 10, 60);
-      const ex = t.x + dir * range(rng, 30, 64);
-      const ey = sy - range(rng, 30, 70);
+  // 幹の上部から左右交互に、上端近くまで何段も枝を出す
+  let side = rng.next() < 0.5 ? -1 : 1;
+  for (let sy = t.top + range(rng, 30, 60); sy > 20; sy -= range(rng, 26, 40)) {
+    for (const dir of [side, rng.next() < 0.5 ? -side : 0]) {
+      if (dir === 0) continue;
+      const ex = t.x + dir * range(rng, 36, 72);
+      const ey = sy - range(rng, 20, 50);
       px.line(t.x + dir * t.width * 0.25, sy, ex, ey, 6, 2, pal.bark[1]!);
       px.line(t.x + dir * t.width * 0.25, sy - 1, ex, ey - 1, 3, 1, pal.bark[2]!);
       // 小枝
@@ -411,6 +413,7 @@ function drawBranches(px: Pix, pal: Palette, t: Trunk, rng: Rng): void {
       const my = (sy + ey) / 2;
       px.line(mx, my, mx + dir * range(rng, 10, 20), my - range(rng, 8, 18), 2, 1, pal.bark[1]!);
     }
+    side = -side;
   }
 }
 
@@ -475,12 +478,16 @@ function leafClump(px: Pix, pal: Palette, cx: number, cy: number, s: number, sha
 function drawCrown(px: Pix, pal: Palette, t: Trunk, seed: number): void {
   const rng = createRng(seed);
   const clumps: { x: number; y: number; s: number; shade: number }[] = [];
+  // 樹冠は幹の上端付近から画面上端まで。上ほど横に広がる
+  const bottom = t.top + 40;
   for (let layer = 0; layer < 3; layer++) {
-    const n = randInt(rng, 6, 8);
+    const n = randInt(rng, 9, 11);
     for (let i = 0; i < n; i++) {
+      const y = range(rng, -8, bottom) + layer * 10;
+      const spread = 50 + 45 * (1 - y / bottom);
       clumps.push({
-        x: t.x + range(rng, -90, 90) * (1 - layer * 0.15),
-        y: t.top - range(rng, -40, 130) + layer * 14,
+        x: t.x + range(rng, -spread, spread) * (1 - layer * 0.12),
+        y,
         s: range(rng, 20, 34),
         shade: layer * 0.45 - 0.5,
       });
@@ -501,20 +508,8 @@ function drawBackCanopy(px: Pix, pal: Palette, seed: number): void {
   let i = 0;
   while (x < px.w + 30) {
     const s = range(rng, 22, 34);
-    leafClump(px, haze, x, range(rng, 40, 150), s, -0.3, seed + i++ * 23);
+    leafClump(px, haze, x, range(rng, 0, 150), s, -0.3, seed + i++ * 23);
     x += s * range(rng, 0.9, 1.5);
-  }
-}
-
-/** 画面上端の葉のつながり */
-function drawCanopyTop(px: Pix, pal: Palette, seed: number): void {
-  const rng = createRng(seed);
-  let x = -10;
-  let i = 0;
-  while (x < px.w + 20) {
-    const s = range(rng, 16, 26);
-    leafClump(px, pal, x, range(rng, -6, 14), s, 0.2, seed + i++ * 17);
-    x += s * range(rng, 1.1, 1.7);
   }
 }
 
@@ -597,7 +592,6 @@ export function renderBackground(ctx: CanvasRenderingContext2D, world: World, ph
     drawBranches(px, pal, t, branchRng);
   });
   world.trunks.forEach((t, i) => drawCrown(px, pal, t, s + 2 + i * 211));
-  drawCanopyTop(px, pal, s + 11);
   drawShrubs(px, pal, s + 4);
   // 上下の余白へ延長する端の行は単色にしておく
   px.rect(0, 0, px.w, EDGE_ROWS, pal.leaf[1]!);
